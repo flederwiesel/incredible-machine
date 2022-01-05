@@ -175,11 +175,13 @@ if [[ $do == run ]]; then
 
 	cat <<EOF > "$context/passwd"
 root:x:0:0:root:/root:/bin/bash
+_apt:x:105:65534::/nonexistent:/usr/sbin/nologin
 poky:x:$uid:$gid:poky:/home/poky:/bin/bash
 EOF
 
 	cat <<EOF > "$context/group"
 root:x:0:
+messagebus:x:106:
 poky:x:$gid:
 EOF
 
