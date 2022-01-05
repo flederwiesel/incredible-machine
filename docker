@@ -1,0 +1,204 @@
+#!/bin/bash
+
+do=run
+buildhost=ubuntu:20.04
+
+for arg
+do
+	if [[ $expect ]]; then
+		buildhost="$args"
+		unset expect
+	elif [[ $pass ]]; then
+		args+=("$arg")
+	else
+		case "$arg" in
+		--help)
+			sed $'s/\\\\033/\033/g' <<-EOF
+				\033[1;37m$0\033[m command options
+
+				commands:
+
+				    build
+				    run
+
+				options:
+
+				    --help
+				    --build-host=$buildhost
+
+EOF
+			exit
+			;;
+		--build-host)
+			expect=buildhost
+			;;
+		--build-host=*)
+			buildhost="${arg:13}"
+			;;
+		-i|--interactive)
+			options+=("$arg")
+			;;
+		--)
+			pass=true
+			;;
+		-*)
+			options+=("$arg")
+			;;
+		build|run|rm)
+			do="$arg"
+			;;
+		*)
+			args+=("$arg")
+			;;
+		esac
+	fi
+done
+
+set -- "${args[@]}"
+
+# Check docker status
+
+dpkg --list docker.io &>/dev/null ||
+{
+	sed $'s/\\\\033/\033/g' <<-EOF >&2
+		\033[1;37mCannot find docker. Please set up path accordingly or\033[m
+		\033[1;37minstall through `sudo apt install --yes docker.io`.\033[m
+EOF
+
+	exit 1
+}
+
+id -Gn | grep -q docker ||
+{
+	sed $'s/\\\\033/\033/g' <<-EOF >&2
+		\033[1;37mUser $(id -un) is not in the docker group.\033[m
+		\033[1;37mUse \`sudo usermod -aG docker $(id -un)\` to add and\033[m
+		\033[1;37mlog off/on to apply new group membership.\033[m
+EOF
+
+	exit 1
+}
+
+readonly scriptdir=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
+readonly context="$HOME/.yocto-devel"
+
+mkdir -p "$context"
+
+trap "rm -rf $context" EXIT
+
+if [[ $do == rm ]]; then
+	docker container rm yocto-${buildhost//:/-}
+fi
+
+if [[ $do == build ]]; then
+	case "$buildhost" in
+	ubuntu:20.04)
+		install+=(
+			lz4
+#			'linux-headers-$(uname -r)'
+		)
+		;;
+	esac
+
+
+	docker build --tag yocto/${buildhost//:/-} --file - "$context" <<_____Dockerfile_____
+		FROM $buildhost
+
+		LABEL version="0.1"
+		LABEL maintainer="flederwiesel@fra-flugplan.de"
+
+		ENV DEBIAN_FRONTEND noninteractive
+
+		RUN apt update
+		RUN apt upgrade --yes
+
+		RUN apt install --yes \
+			build-essential \
+			bison \
+			chrpath \
+			cmake \
+			colordiff \
+			cpio \
+			curl \
+			debianutils \
+			diffstat \
+			fakechroot \
+			fakeroot \
+			flex \
+			gawk \
+			gcc-multilib \
+			git \
+			iputils-ping \
+			libreadline-dev \
+			libsdl1.2-dev \
+			libsqlite-dev \
+			locales \
+			nano \
+			net-tools \
+			nfs-common \
+			patchelf \
+			python \
+			python3 \
+			python3-pexpect \
+			rsync \
+			socat \
+			subversion \
+			sudo \
+			texinfo \
+			unzip \
+			wget \
+			xterm \
+			xutils-dev \
+			xz-utils \
+			zstd ${install[@]}
+
+		RUN locale-gen de_DE.UTF-8
+		RUN locale-gen en_US.UTF-8
+
+		ENV LANG de_DE.UTF-8
+		ENV LANGUAGE de_DE.UTF-8
+		ENV LC_MESSAGES en_US.UTF-8
+
+		RUN groupadd poky
+		RUN useradd --no-user-group --create-home -G sudo,poky poky
+
+		RUN echo "poky ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+		USER poky
+
+_____Dockerfile_____
+fi
+
+if [[ $do == run ]]; then
+	uid=$(id -u)
+	gid=$(id -g)
+
+	cat <<EOF > "$context/passwd"
+root:x:0:0:root:/root:/bin/bash
+poky:x:$uid:$gid:poky:/home/poky:/bin/bash
+EOF
+
+	cat <<EOF > "$context/group"
+root:x:0:
+poky:x:$gid:
+EOF
+
+	run=(
+		--rm
+		--name yocto-${buildhost//:/-}
+		--user=$uid:$gid
+		--hostname yocto-devel
+		--volume "$context/passwd:/etc/passwd"
+		--volume "$context/group:/etc/group"
+		--volume $HOME/.gnupg:/home/poky/.gnupg
+		--volume $HOME/.netrc:/home/poky/.netrc
+		--volume $HOME/.ssh:/home/poky/.ssh
+		--volume $PWD:/home/poky/docker-yocto
+		--workdir=/home/poky/docker-yocto
+		--env TERM=$TERM
+	)
+
+	[[ $@ ]] || run+=(--interactive --tty)
+
+	docker run "${run[@]}" "${options[@]}" yocto/${buildhost//:/-} "$@"
+fi
