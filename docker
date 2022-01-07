@@ -69,6 +69,7 @@ EOF
 }
 
 id -Gn | grep -q docker ||
+[[ $EUID = 0 ]] ||
 {
 	sed $'s/\\\\033/\033/g' <<-EOF >&2
 		\033[1;37mUser $(id -un) is not in the docker group.\033[m
