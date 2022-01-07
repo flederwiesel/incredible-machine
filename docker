@@ -201,7 +201,8 @@ EOF
 		--env TERM=$TERM
 	)
 
-	[[ $@ ]] || run+=(--interactive --tty)
+	[[ -t 0 ]] && run+=(--tty)
+	[[  $@  ]] || run+=(--interactive)
 
 	docker run "${run[@]}" "${options[@]}" yocto/${buildhost//:/-} "$@"
 fi
