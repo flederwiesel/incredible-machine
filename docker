@@ -62,7 +62,7 @@ dpkg --list docker.io &>/dev/null ||
 {
 	sed $'s/\\\\033/\033/g' <<-EOF >&2
 		\033[1;37mCannot find docker. Please set up path accordingly or\033[m
-		\033[1;37minstall through `sudo apt install --yes docker.io`.\033[m
+		\033[1;37minstall through \`sudo apt install --yes docker.io\`.\033[m
 EOF
 
 	exit 1
