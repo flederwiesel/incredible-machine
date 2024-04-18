@@ -1,0 +1,65 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+    - 'master'
+    - 'feature/**'
+
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
+jobs:
+  code-checks:
+    name: Run code checks
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Run hadolint
+      uses: hadolint/hadolint-action@f988afea3da57ee48710a9795b6bb677cc901183
+      with:
+        failure-threshold: warning
+        output-file: /dev/stdout
+
+    - name: Run ShellCheck
+      uses: ludeeus/action-shellcheck@master
+      with:
+        severity: error
+        additional_files: docker
+
+  yocto-build:
+    name: Yocto build in docker
+    runs-on: [ self-hosted, linux ]
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        submodules: true
+
+    - name: Build and run docker image
+      run: |
+        set -e
+
+        ./docker build
+        ./docker run # implicit `bash`
+        ./docker run bash <<< 'exit'
+        ./docker run bash -c 'curl --version' > /dev/null
+        ./docker run --rm false || echo false
+        ./docker rm
+        ./docker rm image
+
+    - name: Build core-image-minimal SDK /w docker yocto-base image
+      run: |
+        set -e
+
+        ./docker build --target yocto-base
+        ./docker run --rm <<EOF
+          . oe-init-build-env
+          bitbake core-image-minimal -c populate_sdk
+        EOF
