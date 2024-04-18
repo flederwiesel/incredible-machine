@@ -124,6 +124,8 @@ elif [[ "run" == "$cmd" ]]; then
 			exit 1
 		}
 
+		touch "$SCRIPTDIR/.bash_history"
+
 		docker create \
 			--name "$CONTAINER_NAME" \
 			--hostname "$CONTAINER_NAME" \
@@ -152,6 +154,10 @@ elif [[ "run" == "$cmd" ]]; then
 				--create-home \
 				--home-dir "/home/$user" \
 				"$user"
+			EOF
+
+		docker exec --interactive "$CONTAINER_NAME" bash <<-EOF
+			ln -s /workspace/.bash_history "/home/$user/"
 			EOF
 	fi
 
