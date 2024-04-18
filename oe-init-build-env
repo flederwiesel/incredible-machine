@@ -1,0 +1,5 @@
+SCRIPTDIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
+
+export TEMPLATECONF="$SCRIPTDIR/poky/meta-poky/conf"
+
+source "$SCRIPTDIR/poky/oe-init-build-env"
