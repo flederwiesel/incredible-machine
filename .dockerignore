@@ -1,0 +1,9 @@
+.dockerignore
+.git/
+.gitmodules
+Dockerfile
+build/
+docker
+downloads/
+poky/
+sstate/
