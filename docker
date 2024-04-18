@@ -1,64 +1,13 @@
 #!/bin/bash
 
-do=run
-buildhost=ubuntu:20.04
+readonly IMAGE_NAME=flederwiesel/yocto
+readonly CONTAINER_NAME=flederwiesel-yocto
+readonly VERSION=0.1
 
-for arg
-do
-	if [[ $expect ]]; then
-		buildhost="$args"
-		unset expect
-	elif [[ $pass ]]; then
-		args+=("$arg")
-	else
-		case "$arg" in
-		--help)
-			sed $'s/\\\\033/\033/g' <<-EOF
-				\033[1;37m$0\033[m command options
+set -euo pipefail
 
-				commands:
-
-				    build
-				    run
-
-				options:
-
-				    --help
-				    --build-host=$buildhost
-
-EOF
-			exit
-			;;
-		--build-host)
-			expect=buildhost
-			;;
-		--build-host=*)
-			buildhost="${arg:13}"
-			;;
-		-i|--interactive)
-			options+=("$arg")
-			;;
-		--)
-			pass=true
-			;;
-		-*)
-			options+=("$arg")
-			;;
-		build|run|rm)
-			do="$arg"
-			;;
-		*)
-			args+=("$arg")
-			;;
-		esac
-	fi
-done
-
-set -- "${args[@]}"
-
-# Check docker status
-
-dpkg --list docker.io &>/dev/null ||
+# Check docker installation
+dpkg --list docker.io &> /dev/null ||
 {
 	sed $'s/\\\\033/\033/g' <<-EOF >&2
 		\033[1;37mCannot find docker. Please set up path accordingly or\033[m
@@ -68,6 +17,7 @@ EOF
 	exit 1
 }
 
+# Check whether user is in docker group
 id -Gn | grep -q docker ||
 [[ $EUID = 0 ]] ||
 {
@@ -80,129 +30,156 @@ EOF
 	exit 1
 }
 
-readonly scriptdir=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
-readonly context="$HOME/.yocto-devel"
+# shellcheck disable=SC2155
+readonly SCRIPTDIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 
-mkdir -p "$context"
+options=()
 
-trap "rm -rf $context" EXIT
+for arg
+do
+	if [[ ${expect:-} ]]; then
+		case "$expect" in
+		--target|--workdir)
+			options+=("$expect" "$arg")
+			;;
+		esac
 
-if [[ $do == rm ]]; then
-	docker container rm yocto-${buildhost//:/-}
-fi
+		unset expect
+	else
+		case "$arg" in
+		-h|--help)
+			sed $'s/\\\\033/\033/g' <<-EOF
+				\033[1;37m$0\033[m [build|run|rm [image]] [options]
 
-if [[ $do == build ]]; then
-	case "$buildhost" in
-	ubuntu:20.04)
-		install+=(
-			lz4
-#			'linux-headers-$(uname -r)'
-		)
-		;;
-	esac
+				    build options:
+				        --target yocto-base
 
+				    run options:
+				        --rm | Remove container after run
+				        --workdir /path/to
 
-	docker build --tag yocto/${buildhost//:/-} --file - "$context" <<_____Dockerfile_____
-		FROM $buildhost
+				    docker options:
+				        --*=* | Passed on to the actual docker command.
 
-		LABEL version="0.1"
-		LABEL maintainer="flederwiesel@fra-flugplan.de"
+				EOF
 
-		ENV DEBIAN_FRONTEND noninteractive
+			exit
+			;;
+		--rm)
+			if [[ "run" == "${cmd:-}" ]]; then
+				oneshot=true
+			else
+				echo 'Option --rm is only valid after `run` command.' >&2
+				exit 1
+			fi
+			;;
+		--target|--workdir)
+			expect="$arg"
+			;;
+		--target=*|--workdir=*)
+			options+=(--target "${arg#*=}")
+			;;
+		--*)
+			options+=("$arg")
+			;;
+		build|run|rm)
+			cmd="$arg"
+			;;
+		image)
+			if [[ "rm" == "${cmd:-}" ]]; then
+				rmi=true
+			else
+				echo 'Option `image` is only valid after `rm` cmd.' >&2
+				exit 1
+			fi
+			;;
+		*)
+			args+=("$arg")
+			;;
+		esac
+	fi
+done
 
-		RUN apt update
-		RUN apt upgrade --yes
+set -- "${args[@]}"
 
-		RUN apt install --yes \
-			build-essential \
-			bison \
-			chrpath \
-			cmake \
-			colordiff \
-			cpio \
-			curl \
-			debianutils \
-			diffstat \
-			fakechroot \
-			fakeroot \
-			flex \
-			gawk \
-			gcc-multilib \
-			git \
-			iputils-ping \
-			libreadline-dev \
-			libsdl1.2-dev \
-			libsqlite-dev \
-			locales \
-			nano \
-			net-tools \
-			nfs-common \
-			patchelf \
-			python \
-			python3 \
-			python3-pexpect \
-			rsync \
-			socat \
-			subversion \
-			sudo \
-			texinfo \
-			unzip \
-			wget \
-			xterm \
-			xutils-dev \
-			xz-utils \
-			zstd ${install[@]}
-
-		RUN locale-gen de_DE.UTF-8
-		RUN locale-gen en_US.UTF-8
-
-		ENV LANG de_DE.UTF-8
-		ENV LANGUAGE de_DE.UTF-8
-		ENV LC_MESSAGES en_US.UTF-8
-
-		RUN groupadd poky
-		RUN useradd --no-user-group --create-home -G sudo,poky poky
-
-		RUN echo "poky ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-
-		USER poky
-
-_____Dockerfile_____
-fi
-
-if [[ $do == run ]]; then
+if [[ "build" == "$cmd" ]]; then
+	docker build --tag "$IMAGE_NAME:$VERSION" "${options[@]}" "$SCRIPTDIR"
+elif [[ "run" == "$cmd" ]]; then
+	user=$(id -un)
 	uid=$(id -u)
 	gid=$(id -g)
 
-	cat <<EOF > "$context/passwd"
-root:x:0:0:root:/root:/bin/bash
-_apt:x:105:65534::/nonexistent:/usr/sbin/nologin
-poky:x:$uid:$gid:poky:/home/poky:/bin/bash
-EOF
+	# Check whether container already exists
+	if ! docker inspect --type container "$CONTAINER_NAME" &> /dev/null; then
+		# Need to create, check for existence of image
+		resp=$(docker inspect --type image "$IMAGE_NAME:$VERSION" 2>&1 > /dev/null) ||
+		{
+			echo "$resp" >&2
+			exit 1
+		}
 
-	cat <<EOF > "$context/group"
-root:x:0:
-messagebus:x:106:
-poky:x:$gid:
-EOF
+		docker create \
+			--name "$CONTAINER_NAME" \
+			--hostname "$CONTAINER_NAME" \
+			--volume "$SCRIPTDIR:/workspace" \
+			"${options[@]}" \
+			"$IMAGE_NAME:$VERSION" \
+			sleep infinity > /dev/null
 
-	run=(
-		--rm
-		--name yocto-${buildhost//:/-}
-		--user=$uid:$gid
-		--hostname yocto-devel
-		--volume "$context/passwd:/etc/passwd"
-		--volume "$context/group:/etc/group"
-		--volume $HOME/.gnupg:/home/poky/.gnupg
-		--volume $HOME/.netrc:/home/poky/.netrc
-		--volume $HOME/.ssh:/home/poky/.ssh
-		--volume $PWD:/home/poky/docker-yocto
-		--workdir=/home/poky/docker-yocto
-		--env TERM=$TERM
+		docker start "$CONTAINER_NAME" > /dev/null
+
+		group=$(id -gn)
+
+		# Create group with caller's gid in container, if not exists
+		docker exec --interactive "$CONTAINER_NAME" bash <<-EOF
+			getent group "$gid" ||
+			groupadd --gid "$gid" "$group"
+			EOF
+
+		# Create user with caller's uid in container, if not exists
+		docker exec --interactive "$CONTAINER_NAME" bash <<-EOF
+			getent passwd "$uid" ||
+			useradd \
+				--uid "$uid" \
+				--gid "$gid" \
+				--no-user-group \
+				--create-home \
+				--home-dir "/home/$user" \
+				"$user"
+			EOF
+	fi
+
+	exec+=(
+		--user "$uid:$gid"
+		--workdir /workspace
+		--env "TERM=${TERM:-xterm-color}"
 	)
 
-	[[ -t 0 ]] && run+=(--tty)
-	[[  $@  ]] || run+=(--interactive)
+	if [[ -t 0 ]]; then
+		exec+=(--tty)
+	fi
 
-	docker run "${run[@]}" "${options[@]}" yocto/${buildhost//:/-} "$@"
+	if [[ -z "$*" ]]; then
+		exec+=(--interactive)
+	fi
+
+	docker exec \
+		"${exec[@]}" \
+		"${options[@]}" \
+		"$CONTAINER_NAME" \
+		"${@:-bash}"
+
+	if ${oneshot:-false}; then
+		docker container rm --force "$CONTAINER_NAME" > /dev/null
+	fi
+elif [[ "rm" == "$cmd" ]]; then
+	if docker inspect --type container "$CONTAINER_NAME" &> /dev/null; then
+		docker container rm --force "$CONTAINER_NAME"
+	fi
+	if ${rmi:-false} && docker inspect --type image "$IMAGE_NAME:$VERSION" &> /dev/null; then
+		docker image rm "$IMAGE_NAME:$VERSION"
+	fi
+else
+	echo "No or unknown command specified." >&2
+	exit 1
 fi
