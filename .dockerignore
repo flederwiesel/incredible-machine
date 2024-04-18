@@ -6,6 +6,7 @@ Dockerfile
 build/
 docker
 downloads/
+meta-raspberrypi/
 oe-init-build-env
 poky/
 sstate/
