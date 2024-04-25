@@ -1,0 +1,20 @@
+Example layer meta-incredible-machine.
+
+Please see the corresponding sections below for details.
+
+Dependencies
+============
+
+  meta-raspberrypi
+  meta-openembedded
+
+Distro
+======
+
+  incredible
+
+Images
+======
+
+  incredible-base-image
+  incredible-development-image

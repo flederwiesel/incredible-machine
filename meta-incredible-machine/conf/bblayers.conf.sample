@@ -1,0 +1,13 @@
+POKY_BBLAYERS_CONF_VERSION = "1"
+
+BBPATH = "${TOPDIR}"
+BBFILES ?= ""
+
+BBLAYERS ?= " \
+    ##OEROOT##/../meta-incredible-machine \
+    ##OEROOT##/../meta-openembedded/meta-oe \
+    ##OEROOT##/../meta-raspberrypi \
+    ##OEROOT##/meta \
+    ##OEROOT##/meta-poky \
+    ##OEROOT##/meta-yocto-bsp \
+"

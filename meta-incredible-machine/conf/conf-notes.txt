@@ -1,0 +1,7 @@
+You can now run `bitbake <target>`
+
+Common targets are:
+
+    incredible-base-image
+    incredible-development-image
+

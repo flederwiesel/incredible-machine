@@ -1,0 +1,23 @@
+MACHINE ?= "raspberrypi"
+
+DISTRO = "incredible"
+
+DEFAULT_TIMEZONE = "Europe/Berlin"
+
+TMPDIR = "${TOPDIR}/tmp"
+DL_DIR = "${TOPDIR}/../downloads"
+SSTATE_DIR = "${TOPDIR}/../sstate"
+
+SDKMACHINE ?= "x86_64"
+SDK_NAME_PREFIX ?= "${DISTRO}-sdk"
+SDK_EXT_TYPE ?= "minimal"
+SDK_INCLUDE_TOOLCHAIN = "1"
+
+COPY_LIC_MANIFEST = "1"
+COPY_LIC_DIRS = "1"
+
+LICENSE_CREATE_PACKAGE = "1"
+
+SANITY_TESTED_DISTROS = "\
+    ubuntu-22.04 \n \
+"
