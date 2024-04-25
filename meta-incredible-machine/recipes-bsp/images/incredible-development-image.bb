@@ -1,6 +1,6 @@
 require recipes-bsp/images/incredible-base-image.bb
 
-IMAGE_FEATURES = " \
+IMAGE_FEATURES += " \
     bash-completion-pkgs \
     dbg-pkgs \
     debug-tweaks \
