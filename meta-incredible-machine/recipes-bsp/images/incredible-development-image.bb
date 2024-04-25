@@ -11,4 +11,5 @@ IMAGE_FEATURES += " \
 
 IMAGE_INSTALL:append = " \
     bash-completion \
+    nano \
 "
