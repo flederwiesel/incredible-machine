@@ -110,7 +110,13 @@ elif [[ "run" == "$cmd" ]]; then
 	gid=$(id -g)
 
 	# Check whether container already exists
-	if ! docker inspect --type container "$CONTAINER_NAME" &> /dev/null; then
+	if status=$(
+			docker inspect --type container "$CONTAINER_NAME" --format "{{.State.Status}}"
+		) &> /dev/null; then
+		if [ "$status" = exited ]; then
+			docker start "$CONTAINER_NAME"
+		fi
+	else
 		# Need to create, check for existence of image
 		resp=$(docker inspect --type image "$IMAGE_NAME:$VERSION" 2>&1 > /dev/null) ||
 		{
