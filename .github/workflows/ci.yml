@@ -28,6 +28,10 @@ jobs:
       uses: ludeeus/action-shellcheck@master
       with:
         severity: error
+        ignore_paths: >-
+          meta-openembedded
+          meta-raspberrypi
+          poky
         additional_files: docker
 
   yocto-build:
