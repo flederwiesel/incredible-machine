@@ -102,9 +102,9 @@ done
 
 set -- "${args[@]}"
 
-if [[ "build" == "$cmd" ]]; then
+if [[ "build" == "${cmd:-}" ]]; then
 	docker build --tag "$IMAGE_NAME:$VERSION" "${options[@]}" "$SCRIPTDIR"
-elif [[ "run" == "$cmd" ]]; then
+elif [[ "run" == "${cmd:-}" ]]; then
 	user=$(id -un)
 	uid=$(id -u)
 	gid=$(id -g)
@@ -184,7 +184,7 @@ elif [[ "run" == "$cmd" ]]; then
 	if ${oneshot:-false}; then
 		docker container rm --force "$CONTAINER_NAME" > /dev/null
 	fi
-elif [[ "rm" == "$cmd" ]]; then
+elif [[ "rm" == "${cmd:-}" ]]; then
 	if docker inspect --type container "$CONTAINER_NAME" &> /dev/null; then
 		docker container rm --force "$CONTAINER_NAME"
 	fi
