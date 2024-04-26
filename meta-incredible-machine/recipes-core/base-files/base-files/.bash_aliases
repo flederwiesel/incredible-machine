@@ -1,0 +1,5 @@
+alias ll='ls -AlF --color=auto --time-style=+"%F %T"'
+alias ls='ls -A --color=auto'
+alias egrep='egrep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias grep='grep --color=auto'
