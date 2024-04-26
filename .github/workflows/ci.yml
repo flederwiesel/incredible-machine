@@ -60,12 +60,13 @@ jobs:
         ./docker rm
         ./docker rm image
 
-    - name: Build core-image-minimal SDK /w docker yocto-base image
+    - name: Build images and SDK /w docker
       run: |
         set -e
 
         ./docker build --target yocto-base
         ./docker run --rm <<EOF
           . oe-init-build-env
-          bitbake core-image-minimal -c populate_sdk
+          bitbake incredible-base-image
+          bitbake incredible-development-image -c populate_sdk
         EOF
