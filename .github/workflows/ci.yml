@@ -33,6 +33,8 @@ jobs:
           meta-raspberrypi
           poky
         additional_files: docker
+      env:
+        SHELLCHECK_OPTS: --shell=bash
 
   yocto-build:
     name: Yocto build in docker
