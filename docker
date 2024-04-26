@@ -111,8 +111,8 @@ elif [[ "run" == "$cmd" ]]; then
 
 	# Check whether container already exists
 	if status=$(
-			docker inspect --type container "$CONTAINER_NAME" --format "{{.State.Status}}"
-		) &> /dev/null; then
+			docker inspect --type container "$CONTAINER_NAME" --format "{{.State.Status}}" 2> /dev/null
+		); then
 		if [ "$status" = exited ]; then
 			docker start "$CONTAINER_NAME"
 		fi
