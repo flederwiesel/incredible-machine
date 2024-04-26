@@ -1,0 +1,52 @@
+#!/bin/bash
+
+set -euo pipefail
+
+trap 'failure_banner' ERR
+
+failure_banner()
+{
+	sed $'s/\\\\033/\033/g' <<EOF >&2
+\033[1;31m###############################################################
+###                                                         ###
+###             Resizing root partition failed.             ###
+###                                                         ###
+###############################################################\033[m
+EOF
+}
+
+# Get root device/partition
+ROOT_PART=$(findmnt -n -o source /)
+ROOT_DEV=/dev/$(lsblk -d -n -o pkname "$ROOT_PART")
+# Get the number and starting offset of the root partition
+PART_NUM=$(grep -o "[[:digit:]]*$" <<< "$ROOT_PART")
+PART_START=$(fdisk -l -o device,start "$ROOT_DEV" | awk '$1 == "'"$ROOT_PART"'" { print $2 }')
+
+# Resize $ROOT_PART
+fdisk "$ROOT_DEV" <<EOF
+p
+d
+$PART_NUM
+n
+p
+$PART_NUM
+$PART_START
+
+p
+w
+EOF
+
+# Resize file system
+resize2fs "$ROOT_PART"
+
+# Remove firstboot parameters from kernel command line
+if ! mount | grep -q /boot; then
+	# Mount boot device
+	BOOT_PART=$(fdisk -l -o Boot,Device "$ROOT_DEV" | awk '$1 == "*" { print $2 }')
+	mount "$BOOT_PART" /boot
+fi
+
+sed -i 's: *systemd\.run=.*systemd.unit=kernel-command-line\.target::g' /boot/cmdline.txt
+
+# Remove ourselves
+rm "$0"
